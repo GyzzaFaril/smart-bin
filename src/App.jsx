@@ -1,121 +1,115 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useState } from 'react';
+import { createClient } from '@supabase/supabase-js';
+
+// Memanggil Environment Variables di Vite menggunakan import.meta.env
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [binData, setBinData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // 1. Fungsi mengambil data awal saat web pertama kali dimuat
+    const fetchInitialData = async () => {
+      const { data, error } = await supabase
+        .from('bin_logs')
+        .select('*')
+        .eq('id', 1)
+        .single();
+      
+      if (!error) {
+        setBinData(data);
+      } else {
+        console.error("Gagal mengambil data:", error);
+      }
+      setLoading(false);
+    };
+
+    fetchInitialData();
+
+    // 2. Fungsi mendengarkan perubahan data secara REAL-TIME
+    const channel = supabase
+      .channel('realtime-bin')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Hanya dengarkan event UPDATE
+          schema: 'public',
+          table: 'bin_logs',
+          filter: 'id=eq.1', // Hanya dengarkan perubahan pada baris ID 1
+        },
+        (payload) => {
+          console.log('Data baru masuk!', payload.new);
+          // Langsung ubah angka di layar tanpa refresh!
+          setBinData(payload.new); 
+        }
+      )
+      .subscribe();
+
+    // Bersihkan pendengar saat komponen ditutup
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  if (loading) {
+    return <h2 style={{ textAlign: 'center', marginTop: '50px' }}>Menghubungkan ke Tong Sampah... ♻️</h2>;
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div style={{ padding: '40px', fontFamily: 'sans-serif', maxWidth: '800px', margin: '0 auto' }}>
+      <h1 style={{ textAlign: 'center', color: '#333' }}>Dashboard Smart Bin 🚮</h1>
+      
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginTop: '30px' }}>
+        
+        <div style={cardStyle}>
+          <h3 style={{ margin: 0, color: '#666' }}>Kapasitas Sampah</h3>
+          <p style={valueStyle}>{binData?.volume_percent || 0} %</p>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
+
+        <div style={cardStyle}>
+          <h3 style={{ margin: 0, color: '#666' }}>Berat Sampah</h3>
+          <p style={valueStyle}>{binData?.weight_kg || 0} kg</p>
+        </div>
+
+        <div style={cardStyle}>
+          <h3 style={{ margin: 0, color: '#666' }}>Kepadatan (Densitas)</h3>
+          <p style={valueStyle}>{binData?.bin_density?.toFixed(2) || 0} g/L</p>
+        </div>
+
+        <div style={cardStyle}>
+          <h3 style={{ margin: 0, color: '#666' }}>Status Penutup</h3>
+          <p style={{ ...valueStyle, color: binData?.servo_status === 'open' ? '#28a745' : '#dc3545' }}>
+            {binData?.servo_status?.toUpperCase() || 'UNKNOWN'}
           </p>
         </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
 
-      <div className="ticks"></div>
+      </div>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <p style={{ textAlign: 'center', marginTop: '40px', fontSize: '14px', color: '#999' }}>
+        Pembaruan Terakhir: {binData?.created_at ? new Date(binData.created_at).toLocaleTimeString('id-ID') : '-'}
+      </p>
+    </div>
+  );
 }
 
-export default App
+// Desain Card sederhana menggunakan Inline Style
+const cardStyle = {
+  padding: '25px',
+  borderRadius: '12px',
+  backgroundColor: '#f8f9fa',
+  border: '1px solid #dee2e6',
+  textAlign: 'center',
+  boxShadow: '0 4px 6px rgba(0,0,0,0.05)'
+};
+
+const valueStyle = {
+  fontSize: '2.5rem',
+  fontWeight: 'bold',
+  color: '#212529',
+  margin: '15px 0 0 0'
+};
+
+export default App;
