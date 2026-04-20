@@ -41,6 +41,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ message: 'Data masuk via Vercel!', density: density });
 
   } catch (error) {
-    return res.status(500).json({ error: 'Terjadi kesalahan server' });
+    // Memunculkan detail error asli ke Thunder Client
+    return res.status(500).json({ 
+      error: 'Terjadi kesalahan server',
+      detail: error.message || error
+    });
   }
 }
