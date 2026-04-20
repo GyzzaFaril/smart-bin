@@ -25,8 +25,8 @@ export default async function handler(req, res) {
     const volumeInLiter = (volume / 100) * 50; 
     const density = volumeInLiter > 0 ? (weight / volumeInLiter) : 0;
 
-    // 4. TIMPA DATA di Supabase (seperti Firebase, tanpa menambah baris baru)
-    const { error } = await supabase
+// 4. TIMPA DATA di Supabase dengan tambahan .select()
+    const { data, error } = await supabase
       .from('bin_logs')
       .update({ 
         volume_percent: volume, 
@@ -34,12 +34,18 @@ export default async function handler(req, res) {
         bin_density: density,
         servo_status: status 
       })
-      .eq('id', 1); // <-- Ini kuncinya: Hanya mengubah baris pertama (id 1)
+      .eq('id', 1)
+      .select(); // <-- Tambahkan ini agar Supabase mengembalikan hasil laporannya
 
     if (error) throw error;
 
+    // Cek apakah Supabase benar-benar menemukan dan mengubah data ID 1
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'GAGAL: Baris data dengan ID 1 tidak ditemukan di tabel Supabase!' });
+    }
+
     // 5. Kirim balasan sukses ke ESP32
-    return res.status(200).json({ message: 'Status tong berhasil diperbarui!', density: density });
+    return res.status(200).json({ message: 'Status tong berhasil diperbarui!', data_baru: data });
 
   } catch (error) {
     // Memunculkan detail error asli ke Thunder Client
